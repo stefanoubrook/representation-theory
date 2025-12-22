@@ -1,0 +1,19 @@
+[project]
+name = "representation-theory"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "mypy>=1.19.1",
+    "numpy>=2.4.0",
+    "pytest>=9.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "mppy>=0.3.4",
+]
+
+[tool.pytest.ini_options]
+pythonpath = "src"
