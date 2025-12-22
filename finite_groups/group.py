@@ -17,6 +17,13 @@ class FiniteGroup:
         # Defined placeholder identity index
         self._identity_index: int | None = None
 
+    def __eq__(self, other):
+        if not isinstance(other, FiniteGroup):
+            return False
+        return self.elements == other.elements and np.array_equal(
+            self.cayley_table, other.cayley_table
+        )
+
     def _validate_group_axioms(self):
         # Validates identity, inverse and associativity
         self._identity_index = self._check_identity()
