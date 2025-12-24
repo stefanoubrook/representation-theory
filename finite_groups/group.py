@@ -93,3 +93,27 @@ class FiniteGroup:
             raise ValueError("Left inverses are not unique")
 
         return True
+
+    def conjugacy_classes(self) -> list:
+        classes = []
+        seen = set()
+
+        for i, x in enumerate(self.elements):
+            if x in seen:
+                continue
+
+            current_class = set()
+            # calculate the orbit of x under conjugation g*x*g^-1
+            for j, g in enumerate(self.elements):
+                g_inv_inx = self._check_inverses(j)
+
+                step_1_inx = self.cayley_table[j][i]
+                conj_inx = self.cayley_table[step_1_inx][g_inv_inx]
+                conj_element = self.elements[conj_inx]
+
+                current_class.add(conj_element)
+                seen.add(conj_element)
+
+            classes.append(list(current_class))
+
+        return classes
