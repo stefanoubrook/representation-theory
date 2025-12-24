@@ -1,5 +1,3 @@
-import re
-
 import numpy as np
 
 from .group import FiniteGroup
@@ -16,87 +14,105 @@ class GroupFactory:
 
         return FiniteGroup(elements, table)
 
-    @staticmethod
-    def parse_presentation(presentation_str: str):
-        clean_str = presentation_str.strip("<> ")
+    @classmethod
+    def symmetric_group(cls, n: int):
+        """Generates S_n of order n! without itertools."""
 
-        if "|" not in clean_str:
-            raise ValueError(
-                "Presentation must contain '|' to seperate genertors from relations"
-            )
+        # Recursive helper to find all permutations
+        def get_permutations(arr):
+            if len(arr) == 0:
+                return [[]]
+            res = []
+            for i in range(len(arr)):
+                rest = arr[:i] + arr[i + 1 :]
+                for p in get_permutations(rest):
+                    res.append([arr[i]] + p)
+            return res
 
-        gen_part, rel_part = clean_str.split("|")
+        elements_list = get_permutations(list(range(n)))
+        # Convert to tuples for dictionary hashing (mapping)
+        elements_tuples = [tuple(p) for p in elements_list]
 
-        generators = [g.strip() for g in gen_part.split(",") if g.strip()]
+        perm_to_idx = {p: i for i, p in enumerate(elements_tuples)}
+        order = len(elements_tuples)
+        table = np.zeros((order, order), dtype=np.int64)
 
-        relations = [r.strip() for r in rel_part.split(",") if r.strip()]
+        for i in range(order):
+            p1 = elements_tuples[i]
+            for j in range(order):
+                p2 = elements_tuples[j]
+                # Composition: (p1 ∘ p2)(k) = p1[p2[k]]
+                res = tuple(p1[p2[k]] for k in range(n))
+                table[i, j] = perm_to_idx[res]
 
-        return generators, relations
+        str_elements = ["".join(map(str, p)) for p in elements_tuples]
+        return FiniteGroup(str_elements, table)
 
-    @staticmethod
-    def expand_relations(rel: str):
-        pattern = r"\((.*?)\)\^(\d+)|(\w+)\^(\d+)"
+    @classmethod
+    def direct_product(cls, group_a, group_b):
+        """Combines two FiniteGroups without itertools."""
+        n_a, n_b = group_a.order, group_b.order
+        new_order = n_a * n_b
 
-        def replacer(match):
-            base = match.group(1) or match.group(3)
-            exponent = match.group(2) or match.group(4)
+        # Build element names manually
+        new_elements = []
+        for a_name in group_a.elements:
+            for b_name in group_b.elements:
+                new_elements.append(f"({a_name},{b_name})")
 
-            return base * int(exponent)
+        table = np.zeros((new_order, new_order), dtype=np.int64)
 
-        while "^" in rel:
-            rel = re.sub(pattern, replacer, rel)
-        return rel
+        for i in range(new_order):
+            # i = idx_a * n_b + idx_b
+            idx_a_i, idx_b_i = divmod(i, n_b)
 
-    @staticmethod
-    def simplify_word(word: str, rules: list[tuple[str, str]]) -> str:
-        # Repeatedly applies reduction rules to a word until no more rules can be applied
-        changed = True
-        while changed:
-            changed = False
-            for lhs, rhs in rules:
-                if lhs in word:
-                    word = word.replace(lhs, rhs, 1)
-                    changed = True
-                    break
-        return word
+            for j in range(new_order):
+                idx_a_j, idx_b_j = divmod(j, n_b)
 
-    @staticmethod
-    def from_presentation(presentation_str: str):
-        generators, raw_relations = GroupFactory.parse_presentation(presentation_str)
-        # Expand + normalize rules
-        rules = []
-        for r in raw_relations:
-            expanded = GroupFactory.expand_relations(r)
-            if "=" in expanded:
-                lhs, rhs = expanded.split("=")
-                rhs = "" if rhs.strip() in ["e", "1"] else rhs.strip()
-                rules.append((lhs.strip(), rhs))
-            else:
-                rules.append((expanded.strip(), ""))
+                # Operation is done component-wise
+                res_a = group_a.cayley_table[idx_a_i, idx_a_j]
+                res_b = group_b.cayley_table[idx_b_i, idx_b_j]
 
-        # BFS to find elements
-        elements = [""]
-        queue = [""]
+                # Resulting index uses the same mapping logic
+                table[i, j] = res_a * n_b + res_b
 
-        while queue:
-            current_word = queue.pop(0)
-            for gen in generators:
-                new_word = current_word + gen
+        return FiniteGroup(new_elements, table)
 
-                # Apply group relations
-                reduced_word = GroupFactory.simplify_word(new_word, rules)
+    @classmethod
+    def dihedral_group(cls, n: int):
+        """Generates D_n of order 2n."""
+        # Elements: (reflection, rotation) where reflection is 0 or 1
+        elements_data = []
+        for s in range(2):
+            for r in range(n):
+                elements_data.append((s, r))
 
-                if reduced_word not in elements:
-                    elements.append(reduced_word)
-                    queue.append(reduced_word)
+        order = 2 * n
+        table = np.zeros((order, order), dtype=np.int64)
 
-        n = len(elements)
-        table = np.zeros((n, n), dtype=int)
-        element_to_ind = {word: i for i, word in enumerate(elements)}
+        for i in range(order):
+            s1, r1 = elements_data[i]
+            for j in range(order):
+                s2, r2 = elements_data[j]
 
-        for i, row_word in enumerate(elements):
-            for j, col_word in enumerate(elements):
-                combined = row_word + col_word
-                simplified = GroupFactory.simplify_word(combined, rules)
-                table[i, j] = element_to_ind[simplified]
-        return FiniteGroup(elements, table)
+                # Applying (s1, r1) * (s2, r2):
+                if s1 == 0:
+                    # Identity or pure rotation on the left
+                    res_s = s2
+                    res_r = (r1 + r2) % n
+                else:
+                    # Reflection on the left: s * s = e, s * r = r^-1 * s
+                    res_s = 1 - s2
+                    res_r = (r1 - r2) % n
+
+                # Calculate index: (res_s * n) + res_r
+                table[i, j] = res_s * n + res_r
+
+        # Friendly names: e, r, r2... s, sr, sr2...
+        names = []
+        for s, r in elements_data:
+            prefix = "s" if s == 1 else ""
+            suffix = f"r{r}" if r > 0 else ("e" if s == 0 else "")
+            names.append(prefix + suffix)
+
+        return FiniteGroup(names, table)

@@ -24,6 +24,9 @@ class FiniteGroup:
             self.cayley_table, other.cayley_table
         )
 
+    def __repr__(self):
+        return f"Group(elements = {self.elements}, order = {self.order})"
+
     def _validate_group_axioms(self):
         # Validates identity, inverse and associativity
         self._identity_index = self._check_identity()

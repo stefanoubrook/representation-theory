@@ -1,19 +1,19 @@
 [project]
 name = "representation-theory"
 version = "0.1.0"
-description = "Add your description here"
+description = "A library for Finite Group Theory and Representation Theory"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "mypy>=1.19.1",
     "numpy>=2.4.0",
     "pytest>=9.0.2",
-]
-
-[dependency-groups]
-dev = [
-    "mppy>=0.3.4",
+    "mypy>=1.19.1",
 ]
 
 [tool.pytest.ini_options]
-pythonpath = "src"
+# . means "look in the current directory" for the finite_groups package
+pythonpath = "." 
+# -v gives you the nice list of test names instead of dots
+# --tb=short makes error messages less cluttered
+addopts = "-v --tb=short"
+testpaths = ["tests"]
