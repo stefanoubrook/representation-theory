@@ -1,7 +1,10 @@
 import numpy as np
 
 from finite_groups.factory import GroupFactory
-from finite_groups.representations.characters import compute_character_table
+from finite_groups.representations.characters import (
+    compute_character_table,
+    decompose_character,
+)
 
 
 def test_s3_character_table():
@@ -31,6 +34,13 @@ def test_s3_character_table():
             expected = 1.0 if i == j else 0.0
             assert np.isclose(inner_product, expected, atol=1e-7)
 
+    # Check column orthogonality
+    for i in range(len(classes)):
+        for j in range(len(classes)):
+            col_inner_product = np.sum(table[:, i] * np.conj(table[:, j]))
+            expected = (order / class_sizes[i]) if i == j else 0.0
+            assert np.isclose(col_inner_product, expected, atol=1e-7)
+
 
 def test_cyclic_group_table():
     n = 4
@@ -42,4 +52,23 @@ def test_cyclic_group_table():
         assert np.isclose(abs(row[0]), 1.0)
 
 
-print(compute_character_table(GroupFactory.symmetric_group(3)))
+def test_regular_representation_decomp():
+    # Regular repn character phi has:
+    # phi(id) = |G|
+    # phi(g) = 0 for g!= id
+    # must contain every irrep chi_i with multiplicity d_i
+
+    group = GroupFactory.symmetric_group(3)
+    order = group.order
+    table, classes = compute_character_table(group)
+
+    phi_reg = np.zeros(len(classes))
+    phi_reg[0] = order
+
+    multiplicities, _ = decompose_character(phi_reg, group)
+
+    for i, chi in enumerate(table):
+        dimension = int(round(chi[0].real))
+        assert multiplicities[i] == dimension, (
+            f"Irrep {i} should appear {dimension} times, got {multiplicities[i]}"
+        )

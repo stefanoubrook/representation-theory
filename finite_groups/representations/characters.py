@@ -1,5 +1,7 @@
 import numpy as np
 
+from finite_groups import FiniteGroup
+
 
 def compute_character_table(group) -> tuple[np.ndarray, list]:
     classes = group.conjugacy_classes()
@@ -21,7 +23,7 @@ def compute_character_table(group) -> tuple[np.ndarray, list]:
                     k_inx = el_to_class_inx[product]
                     M_i[j_inx, k_inx] += 1
 
-        # Normalize c_ijk properly
+        # Normalize c_ijk
         for row in range(k):
             for col in range(k):
                 M_i[row, col] /= len(classes[col])
@@ -39,7 +41,6 @@ def compute_character_table(group) -> tuple[np.ndarray, list]:
         v = eigenvectors[:, col]
         stable_idx = np.argmax(np.abs(v))
 
-        # renamed list to 'omega_list' to avoid linter warnings
         omega_list = []
         for M_i in matrices:
             val = (M_i @ v)[stable_idx] / v[stable_idx]
@@ -68,3 +69,25 @@ def compute_character_table(group) -> tuple[np.ndarray, list]:
 def clean_table(table, decimals=5):
     table = np.where(np.abs(np.imag(table)) < 1e-10, np.real(table), table)
     return np.round(table, decimals)
+
+
+def decompose_character(
+    reducible_phi: np.ndarray, group: FiniteGroup
+) -> tuple[dict, np.ndarray]:
+    # get necessary data out of the group
+    table, classes = compute_character_table(group)
+    order = group.order
+    class_sizes = np.array([len(c) for c in classes])
+
+    multiplicities = {}
+
+    # Compute multiplicities using Shur's orthogonality
+    for i, chi_i in enumerate(table):
+        # a_i = <phi, chi_i> = (1/|G|) * sum(|C_J| * phi(g_j) *. conj(chi_i(g_j)))
+        inner_product = np.sum(class_sizes * reducible_phi * np.conj(chi_i))
+        a_i = inner_product / order
+        m = int(np.round(a_i.real))
+
+        if m > 0:
+            multiplicities[i] = m
+    return multiplicities, table
