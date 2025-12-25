@@ -24,6 +24,15 @@ class FiniteGroup:
             self.cayley_table, other.cayley_table
         )
 
+    def el_to_inx(self, g):
+        return {el: inx for inx, el in enumerate(self.elements)}[g]
+
+    def multiply(self, g, h):
+        element_inx = {el: inx for inx, el in enumerate(self.elements)}
+        g_inx = element_inx[g]
+        h_inx = element_inx[h]
+        return self.elements[self.cayley_table[g_inx][h_inx]]
+
     def __repr__(self):
         return f"Group(elements = {self.elements}, order = {self.order})"
 
@@ -94,6 +103,12 @@ class FiniteGroup:
 
         return True
 
+    def get_inverse(self, g):
+        for h in self.elements:
+            if self.multiply(g, h) == self.elements[self._check_identity()]:
+                return h
+        return ValueError("Invalid Group: No inverse found")
+
     def conjugacy_classes(self) -> list:
         classes = []
         seen = set()
@@ -105,7 +120,8 @@ class FiniteGroup:
             current_class = set()
             # calculate the orbit of x under conjugation g*x*g^-1
             for j, g in enumerate(self.elements):
-                g_inv_inx = self._check_inverses(j)
+                g_inv = self.get_inverse(g)
+                g_inv_inx = self.el_to_inx(g_inv)
 
                 step_1_inx = self.cayley_table[j][i]
                 conj_inx = self.cayley_table[step_1_inx][g_inv_inx]
@@ -115,5 +131,11 @@ class FiniteGroup:
                 seen.add(conj_element)
 
             classes.append(list(current_class))
+
+        identity_elment = self.elements[self._check_identity()]
+        for i, cls in enumerate(classes):
+            if identity_elment in cls:
+                classes.insert(0, classes.pop(i))
+                break
 
         return classes
